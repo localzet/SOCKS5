@@ -14,10 +14,10 @@
  */
 ini_set("memory_limit", "512M");
 
-use \Workerman\Worker;
-use \Workerman\Timer;
-use \Workerman\Connection\AsyncTcpConnection;
-use \Workerman\Connection\AsyncUdpConnection;
+use localzet\Server as Worker;
+use localzet\Timer;
+use localzet\Server\Connection\AsyncTcpConnection;
+use localzet\Server\Connection\AsyncUdpConnection;
 
 // 自动加载类
 require_once __DIR__ . '/vendor/autoload.php';
@@ -54,19 +54,26 @@ define('METHOD_GSSAPI', 1);
 define('METHOD_USER_PASS', 2);
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/HandshakeBuffer.php';
+Worker::$pidFile = getenv('SOCKS5_PID_FILE') ?: sys_get_temp_dir() . '/localzet-socks5.pid';
+Worker::$logFile = getenv('SOCKS5_LOG_FILE') ?: sys_get_temp_dir() . '/localzet-socks5.log';
 
 if (count($config['auth']) == 0) {
     $config['auth'] = [METHOD_NO_AUTH => true];
 }
 
-$worker = new Worker('tcp://0.0.0.0:' . $config['tcp_port']);
+$worker = new Worker('tcp://' . $config['bind_address'] . ':' . $config['tcp_port']);
 $worker->onConnect = function ($connection) {
     $connection->stage = STAGE_INIT;
+    $connection->handshakeBuffer = new HandshakeBuffer();
+    $connection->handshakeTimerId = Timer::add(10, function () use ($connection) {
+        if ($connection->stage !== STAGE_STREAM) $connection->close();
+    }, [], false);
     $connection->auth_type = NULL;
 };
-$worker->onMessage = function ($connection, $buffer) {
+$handlePacket = function ($connection, $buffer) {
     global $config;
-    logger(LOG_DEBUG, "recv:" . bin2hex($buffer));
+
     switch ($connection->stage) {
             // 初始化环节
         case STAGE_INIT:
@@ -342,7 +349,7 @@ $worker->onMessage = function ($connection, $buffer) {
                             $connection->stage = STAGE_DNS;
                             $addr = dns_get_record($request['dest_addr'], DNS_A);
                             $addr = $addr ? array_pop($addr) : null;
-                            logger(LOG_DEBUG, 'DNS resolved ' . $request['dest_addr'] . ' => ' . $addr['ip']);
+                            logger(LOG_DEBUG, 'DNS resolved ' . $request['dest_addr'] . ' => ' . ($addr['ip'] ?? 'unavailable'));
                         } else {
                             $addr['ip'] = $request['dest_addr'];
                         }
@@ -352,17 +359,27 @@ $worker->onMessage = function ($connection, $buffer) {
                     if ($addr) {
                         $connection->stage = STAGE_CONNECTING;
                         $remote_connection = new AsyncTcpConnection('tcp://' . $addr['ip'] . ':' . $request['dest_port']);
+                        $connection->remoteConnection = $remote_connection;
+                        $remote_connection->onError = function () use ($connection) {
+                            $connection->stage = STAGE_DESTROYED;
+                            $connection->close("\x05\x05\x00\x01\x00\x00\x00\x00\x00\x00");
+                        };
                         $remote_connection->onConnect = function ($remote_connection) use ($connection, $request) {
-                            $connection->state = STAGE_STREAM;
+                            $connection->stage = STAGE_STREAM;
+                            Timer::del($connection->handshakeTimerId);
                             $response = [];
                             $response['ver'] = 5;
                             $response['rep'] = 0;
                             $response['rsv'] = 0;
-                            $response['addr_type'] = $request['addr_type'];
-                            $response['bind_addr'] = '0.0.0.0';
-                            $response['bind_port'] = 18512;
+                            $response['addr_type'] = ADDRTYPE_IPV4;
+                            $response['bind_addr'] = $remote_connection->getLocalIp();
+                            $response['bind_port'] = $remote_connection->getLocalPort();
 
                             $connection->send(packResponse($response));
+                            $pending = $connection->handshakeBuffer->drain();
+                            if ($pending !== '') {
+                                $remote_connection->send($pending);
+                            }
                             $connection->pipe($remote_connection);
                             $remote_connection->pipe($connection);
                             logger(LOG_DEBUG, 'tcp://' . $request['dest_addr'] . ':' . $request['dest_port'] . ' [OK]');
@@ -384,6 +401,11 @@ $worker->onMessage = function ($connection, $buffer) {
                     }
                     break;
                 case CMD_UDP_ASSOCIATE:
+                    if (!$config['udp_enabled']) {
+                        $connection->stage = STAGE_DESTROYED;
+                        $connection->close("\x05\x07\x00\x01\x00\x00\x00\x00\x00\x00");
+                        return;
+                    }
                     $connection->stage = STAGE_UDP_ASSOC;
                     var_dump("CMD_UDP_ASSOCIATE " . $config['udp_port']);
                     if ($config['udp_port'] == 0) {
@@ -428,7 +450,21 @@ $worker->onMessage = function ($connection, $buffer) {
             }
     }
 };
+$worker->onMessage = function ($connection, $data) use ($handlePacket) {
+    try {
+        $connection->handshakeBuffer->append($data);
+        while (($packet = $connection->handshakeBuffer->take($connection->stage)) !== null) {
+            $handlePacket($connection, $packet);
+            if ($connection->stage === STAGE_DESTROYED) return;
+        }
+    } catch (UnexpectedValueException $exception) {
+        $connection->stage = STAGE_DESTROYED;
+        $connection->close();
+    }
+};
 $worker->onClose = function ($connection) {
+    Timer::del($connection->handshakeTimerId);
+    if (isset($connection->remoteConnection)) $connection->remoteConnection->close();
     logger(LOG_INFO, "client closed.");
 };
 
@@ -512,7 +548,8 @@ function udpWorkerOnMessage($udp_connection, $data, &$worker)
     $worker->udpConnections[$remote_connection->id] = $remote_connection;
 }
 
-$udpWorker = new Worker('udp://0.0.0.0:1080');
+if ($config['udp_enabled'] && $config['udp_port'] > 0) {
+$udpWorker = new Worker('udp://' . $config['bind_address'] . ':' . $config['udp_port']);
 $udpWorker->incId = 0;
 $udpWorker->onWorkerStart = function ($worker) {
     $worker->udpConnections = [];
@@ -527,6 +564,8 @@ $udpWorker->onWorkerStart = function ($worker) {
     });
 };
 $udpWorker->onMessage = 'udpWorkerOnMessage';
+
+}
 
 function packResponse($response)
 {
