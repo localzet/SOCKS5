@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ivan Zorin <creator@localzet.com> (Localzet contributions)
+# SPDX-License-Identifier: AGPL-3.0
 from __future__ import annotations
 
 import os
