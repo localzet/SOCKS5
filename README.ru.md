@@ -35,3 +35,7 @@ python3 tests/integration.py
 ```
 
 Тесты поднимают временный прокси и локальный echo-сервер, проверяют фрагментацию и объединение handshake, ранние TCP-данные, relay, неверные учётные данные и запрет UDP/анонимного доступа. CI не развёртывает сервис и не публикует релиз. Лицензии — `LICENSE` и `MIT-LICENSE.txt`.
+
+## Attribution
+
+Maintainer of Localzet contributions: **Ivan Zorin (localzet)** — <creator@localzet.com> · https://www.localzet.com. Copyright © 2026 Localzet Group. Original authorship and third-party licenses remain applicable. See [AUTHORS](.github/AUTHORS.md).

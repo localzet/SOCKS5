@@ -35,3 +35,7 @@ python3 tests/integration.py
 ```
 
 The integration suite starts a temporary proxy and local echo server, then checks fragmented/coalesced handshakes, early TCP data, relay, wrong credentials and disabled UDP/anonymous access. CI does not deploy or publish a release. See `LICENSE` and `MIT-LICENSE.txt` for retained licensing.
+
+## Attribution
+
+Maintainer of Localzet contributions: **Ivan Zorin (localzet)** — <creator@localzet.com> · https://www.localzet.com. Copyright © 2026 Localzet Group. Original authorship and third-party licenses remain applicable. See [AUTHORS](.github/AUTHORS.md).
