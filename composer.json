@@ -1,26 +1,26 @@
 {
-    "name": "localzet/socks5",
-    "description": "Socks5 Proxy",
-    "type": "library",
-    "keywords": [
-        "localzet"
-    ],
-    "license": "AGPL-3.0-or-later",
-    "authors": [
-        {
-            "role": "Developer",
-            "name": "Ivan Zorin",
-            "email": "creator@localzet.com",
-            "homepage": "https://github.com/localzet"
-        }
-    ],
-    "support": {
-        "email": "support@localzet.com",
-        "issues": "https://github.com/localzet/Socks5/issues",
-        "source": "https://github.com/localzet/Socks5"
-    },
-    "require": {
-        "php": "^8.2",
-        "localzet/server": "^4.1"
+  "name": "localzet/socks5",
+  "description": "Socks5 Proxy",
+  "type": "library",
+  "keywords": [
+    "localzet"
+  ],
+  "license": "AGPL-3.0-or-later",
+  "authors": [
+    {
+      "role": "Developer",
+      "name": "Ivan Zorin",
+      "email": "creator@localzet.com",
+      "homepage": "https://github.com/localzet"
     }
+  ],
+  "support": {
+    "email": "support@localzet.com",
+    "issues": "https://github.com/localzet/Socks5/issues",
+    "source": "https://github.com/localzet/Socks5"
+  },
+  "require": {
+    "php": "^8.2",
+    "localzet/server": "^4.1"
+  }
 }
