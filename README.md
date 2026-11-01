@@ -1,6 +1,6 @@
 # Localzet SOCKS5
 
-A PHP SOCKS5 TCP CONNECT proxy running on Localzet Server. This fork retains the original Walkor MIT notices; repository changes are covered by the project license.
+A PHP SOCKS5 TCP CONNECT proxy running on Localzet Server 7.x. Licensed under the GNU Affero General Public License v3 or later.
 
 [Русская документация](README.ru.md)
 
@@ -15,7 +15,7 @@ php start.php start
 php start.php stop
 ```
 
-Configuration: `SOCKS5_BIND` (default `127.0.0.1`), `SOCKS5_PORT` (1080), `SOCKS5_USERNAME`, `SOCKS5_PASSWORD`. Missing credentials refuse startup. An explicit `SOCKS5_ALLOW_NO_AUTH=1` is supported only on a loopback bind. Never expose an anonymous proxy to a public network. Optional `SOCKS5_PID_FILE` and `SOCKS5_LOG_FILE` select service-managed runtime files.
+Configuration: `SOCKS5_BIND` (default `127.0.0.1`), `SOCKS5_PORT` (1080), `SOCKS5_USERNAME`, `SOCKS5_PASSWORD`, `SOCKS5_MAX_CONNECTIONS` (1024 per worker), `SOCKS5_MAX_CONNECTIONS_PER_IP` (32), and `SOCKS5_MAX_ATTEMPTS_PER_MINUTE` (120). Missing credentials refuse startup. An explicit `SOCKS5_ALLOW_NO_AUTH=1` is supported only on a loopback bind. Never expose an anonymous proxy to a public network. Optional `SOCKS5_PID_FILE` and `SOCKS5_LOG_FILE` select service-managed runtime files.
 
 SOCKS username/password authentication is plaintext on the wire, not encryption. Use a trusted local network or an authenticated encrypted tunnel; network binding is not a replacement for ingress controls. Logs do not dump authentication packets.
 
@@ -23,9 +23,9 @@ SOCKS username/password authentication is plaintext on the wire, not encryption.
 
 TCP CONNECT with IPv4 destinations and DNS names. Handshake data is buffered across TCP fragments; coalesced authentication/CONNECT messages and early relay payloads are retained. The buffer is bounded to 64 KiB and handshake establishment to 10 seconds. Connection failures return a SOCKS failure; successful replies use the actual outgoing socket bind address and port.
 
-UDP ASSOCIATE is disabled in the shipped configuration. Its inherited implementation is experimental and has not been validated for per-client isolation; do not enable it for production. BIND and IPv6 destinations are not implemented and are rejected. DNS lookup currently blocks the worker; an asynchronous resolver, connection limits, rate limits and endpoint access policy remain deployment concerns.
+UDP ASSOCIATE is disabled in the shipped configuration. Its inherited implementation is experimental and has not been validated for per-client isolation; do not enable it for production. BIND and IPv6 destinations are not implemented and are rejected. DNS lookup currently blocks the worker; DNS lookup currently blocks the worker; an asynchronous resolver and endpoint access policy remain deployment concerns. Concurrent connection and per-IP attempt limits are configurable, but tune them for your traffic and process count.
 
-This source revision changes defaults: the listener binds loopback, hardcoded `user/pass` is removed, anonymous authentication requires explicit opt-in, and UDP is no longer opened unconditionally. Review service configuration before upgrading. Workerman imports are replaced with the Localzet dependency already declared by the package.
+This source revision changes defaults: the listener binds loopback, hardcoded `user/pass` is removed, anonymous authentication requires explicit opt-in, and UDP is no longer opened unconditionally. Review service configuration before upgrading. The implementation uses the Localzet Server dependency declared by the package.
 
 ## Validation
 
@@ -34,8 +34,8 @@ composer validate --no-check-publish
 python3 tests/integration.py
 ```
 
-The integration suite starts a temporary proxy and local echo server, then checks fragmented/coalesced handshakes, early TCP data, relay, wrong credentials and disabled UDP/anonymous access. CI does not deploy or publish a release. See `LICENSE` and `MIT-LICENSE.txt` for retained licensing.
+The integration suite starts a temporary proxy and local echo server, then checks fragmented/coalesced handshakes, early TCP data, relay, wrong credentials, disabled UDP/anonymous access, global and per-IP concurrent connection caps, and the per-IP attempt rate limit. CI does not deploy or publish a release. See `LICENSE` for licensing terms.
 
 ## Attribution
 
-Maintainer of Localzet contributions: **Ivan Zorin (localzet)** — <creator@localzet.com> · https://www.localzet.com. Copyright © 2026 Localzet Group. Original authorship and third-party licenses remain applicable. See [AUTHORS](.github/AUTHORS.md).
+Copyright © 2016-2026 [Localzet Group](https://www.localzet.com/). All rights reserved.

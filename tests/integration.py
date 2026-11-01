@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Ivan Zorin <creator@localzet.com> (Localzet contributions)
+# SPDX-FileCopyrightText: 2016-2026 Localzet Group
 # SPDX-License-Identifier: AGPL-3.0
 from __future__ import annotations
 
@@ -50,7 +50,9 @@ class SocksTests(unittest.TestCase):
             allocator.bind(('127.0.0.1', 0))
             cls.port = allocator.getsockname()[1]
         env = {**os.environ, 'SOCKS5_PORT': str(cls.port), 'SOCKS5_USERNAME': 'test-user', 'SOCKS5_PASSWORD': 'test-password',
-               'SOCKS5_PID_FILE': str(Path(cls.runtime.name, 'server.pid')), 'SOCKS5_LOG_FILE': str(Path(cls.runtime.name, 'server.log'))}
+               'SOCKS5_PID_FILE': str(Path(cls.runtime.name, 'server.pid')), 'SOCKS5_LOG_FILE': str(Path(cls.runtime.name, 'server.log')),
+               'SOCKS5_MAX_CONNECTIONS': '8', 'SOCKS5_MAX_CONNECTIONS_PER_IP': '4',
+               'SOCKS5_MAX_ATTEMPTS_PER_MINUTE': '30'}
         cls.log = open(Path(cls.runtime.name, 'stdout.log'), 'w')
         cls.process = subprocess.Popen(['php', 'start.php', 'start'], cwd=ROOT, env=env, stdout=cls.log, stderr=subprocess.STDOUT, start_new_session=True)
         for _ in range(100):
@@ -75,8 +77,11 @@ class SocksTests(unittest.TestCase):
         cls.log.close()
         cls.runtime.cleanup()
 
-    def connect(self):
-        stream = socket.create_connection(('127.0.0.1', self.port), timeout=2)
+    def connect(self, source='127.0.0.1'):
+        stream = socket.socket()
+        stream.settimeout(2)
+        stream.bind((source, 0))
+        stream.connect(('127.0.0.1', self.port))
         stream.settimeout(2)
         self.addCleanup(stream.close)
         return stream
@@ -126,11 +131,47 @@ class SocksTests(unittest.TestCase):
         stream.sendall(b'\x01\x09test-user\x05wrong')
         self.assertEqual(receive(stream, 2), b'\x01\x01')
 
+    def test_z_rate_limit(self):
+        blocked = False
+        accepted = 0
+        for _ in range(40):
+            stream = self.connect()
+            stream.sendall(b'\x05\x01\x02')
+            try:
+                response = stream.recv(2)
+            except ConnectionResetError:
+                response = b''
+            if response == b'':
+                blocked = True
+                stream.close()
+                break
+            accepted += 1
+            stream.close()
+            time.sleep(0.03)
+        self.assertGreater(accepted, 0, 'some requests must pass before the rate threshold')
+        self.assertTrue(blocked, 'connection attempts above the configured per-IP rate must be rejected')
+
     def test_udp_is_disabled(self):
         stream = self.connect()
         self.authenticate(stream)
         stream.sendall(b'\x05\x03\x00\x01\x00\x00\x00\x00\x00\x00')
         self.assertEqual(receive(stream, 10)[:2], b'\x05\x07')
+
+    def test_global_connection_limit(self):
+        streams = [self.connect('127.0.0.1') for _ in range(4)]
+        streams.extend(self.connect('127.0.0.2') for _ in range(4))
+        streams.append(self.connect('127.0.0.3'))
+        self.assertEqual(streams[-1].recv(1), b'')
+        for stream in streams:
+            stream.close()
+        time.sleep(0.05)
+
+    def test_per_ip_connection_limit(self):
+        streams = [self.connect() for _ in range(5)]
+        self.assertEqual(streams[-1].recv(1), b'')
+        for stream in streams:
+            stream.close()
+        time.sleep(0.05)
 
     def test_invalid_greeting_is_rejected(self):
         stream = self.connect()

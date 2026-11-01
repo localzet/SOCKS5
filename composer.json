@@ -21,6 +21,6 @@
   },
   "require": {
     "php": "^8.2",
-    "localzet/server": "^4.1"
+    "localzet/server": "^7.0"
   }
 }
