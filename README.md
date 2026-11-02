@@ -23,15 +23,17 @@ SOCKS username/password authentication is plaintext on the wire, not encryption.
 
 TCP CONNECT with IPv4 destinations and DNS names. Handshake data is buffered across TCP fragments; coalesced authentication/CONNECT messages and early relay payloads are retained. The buffer is bounded to 64 KiB and handshake establishment to 10 seconds. Connection failures return a SOCKS failure; successful replies use the actual outgoing socket bind address and port.
 
-UDP ASSOCIATE is disabled in the shipped configuration. Its inherited implementation is experimental and has not been validated for per-client isolation; do not enable it for production. BIND and IPv6 destinations are not implemented and are rejected. DNS lookup currently blocks the worker; DNS lookup currently blocks the worker; an asynchronous resolver and endpoint access policy remain deployment concerns. Concurrent connection and per-IP attempt limits are configurable, but tune them for your traffic and process count.
+UDP ASSOCIATE is disabled in the shipped configuration. Its inherited implementation is experimental and has not been validated for per-client isolation; do not enable it for production. BIND and IPv6 destinations are not implemented and are rejected. DNS lookup currently blocks the worker; an asynchronous resolver and endpoint access policy remain deployment concerns. Concurrent connection and per-IP attempt limits are configurable, but tune them for your traffic and process count.
 
 This source revision changes defaults: the listener binds loopback, hardcoded `user/pass` is removed, anonymous authentication requires explicit opt-in, and UDP is no longer opened unconditionally. Review service configuration before upgrading. The implementation uses the Localzet Server dependency declared by the package.
 
 ## Validation
 
 ```sh
-composer validate --no-check-publish
-python3 tests/integration.py
+composer validate --strict --no-check-publish
+composer install
+composer run check
+composer audit
 ```
 
 The integration suite starts a temporary proxy and local echo server, then checks fragmented/coalesced handshakes, early TCP data, relay, wrong credentials, disabled UDP/anonymous access, global and per-IP concurrent connection caps, and the per-IP attempt rate limit. CI does not deploy or publish a release. See `LICENSE` for licensing terms.

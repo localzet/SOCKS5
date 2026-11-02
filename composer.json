@@ -22,5 +22,13 @@
   "require": {
     "php": "^8.2",
     "localzet/server": "^7.0"
+  },
+  "scripts": {
+    "lint": "php -l start.php && php -l config.php && php -l HandshakeBuffer.php",
+    "test:integration": "python3 tests/integration.py",
+    "check": [
+      "@lint",
+      "@test:integration"
+    ]
   }
 }
