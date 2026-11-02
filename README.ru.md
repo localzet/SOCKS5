@@ -30,8 +30,10 @@ UDP ASSOCIATE выключен в поставляемой конфигурац�
 ## Проверка
 
 ```sh
-composer validate --no-check-publish
-python3 tests/integration.py
+composer validate --strict --no-check-publish
+composer install
+composer run check
+composer audit
 ```
 
 Тесты поднимают временный прокси и локальный echo-сервер, проверяют фрагментацию и объединение handshake, ранние TCP-данные, relay, неверные учётные данные и запрет UDP/анонимного доступа. CI не развёртывает сервис и не публикует релиз. Лицензия — `LICENSE`.

@@ -1,17 +1,23 @@
-name: SOCKS5 integration
+name: CI
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4', '8.5']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
         with:
-          php-version: '8.2'
+          php-version: ${{ matrix.php }}
           extensions: pcntl, posix, sockets
           coverage: none
-      - run: composer validate --no-check-publish
-      - run: composer install --no-dev --no-interaction --prefer-dist
-      - run: python3 tests/integration.py
+          tools: composer:v2
+      - run: composer validate --strict --no-check-publish
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer run check
+      - run: composer audit
