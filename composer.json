@@ -24,10 +24,12 @@
     "localzet/server": "^7.0"
   },
   "scripts": {
-    "lint": "php -l start.php && php -l config.php && php -l HandshakeBuffer.php",
+    "lint": "php -l start.php && php -l config.php && php -l HandshakeBuffer.php && php -l AttemptRateLimiter.php && php -l tests/attempt_rate_limiter.php",
+    "test:unit": "php tests/attempt_rate_limiter.php",
     "test:integration": "python3 tests/integration.py",
     "check": [
       "@lint",
+      "@test:unit",
       "@test:integration"
     ]
   }

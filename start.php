@@ -67,6 +67,7 @@ define('METHOD_USER_PASS', 2);
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/HandshakeBuffer.php';
+require_once __DIR__ . '/AttemptRateLimiter.php';
 Worker::$pidFile = getenv('SOCKS5_PID_FILE') ?: sys_get_temp_dir() . '/localzet-socks5.pid';
 Worker::$logFile = getenv('SOCKS5_LOG_FILE') ?: sys_get_temp_dir() . '/localzet-socks5.log';
 
@@ -75,18 +76,11 @@ if (count($config['auth']) == 0) {
 }
 
 $worker = new Worker('tcp://' . $config['bind_address'] . ':' . $config['tcp_port']);
-$worker->onConnect = function ($connection) use ($worker, $config) {
-    static $attemptsByIp = [];
-    $now = microtime(true);
-    foreach ($attemptsByIp as $ip => $attempts) {
-        $attemptsByIp[$ip] = array_values(array_filter($attempts, static fn (float $at): bool => $at > $now - 60));
-        if ($attemptsByIp[$ip] === []) unset($attemptsByIp[$ip]);
-    }
-
+$attemptRateLimiter = new AttemptRateLimiter($config['max_attempts_per_minute']);
+$worker->onConnect = function ($connection) use ($worker, $config, $attemptRateLimiter) {
     $ip = $connection->getRemoteIp();
-    $attemptsByIp[$ip] ??= [];
     if (count($worker->connections) > $config['max_connections'] ||
-        count($attemptsByIp[$ip]) >= $config['max_attempts_per_minute']) {
+        !$attemptRateLimiter->allows($ip, hrtime(true) / 1_000_000_000)) {
         $connection->close();
         return;
     }
@@ -99,8 +93,6 @@ $worker->onConnect = function ($connection) use ($worker, $config) {
         $connection->close();
         return;
     }
-    $attemptsByIp[$ip][] = $now;
-
     $connection->stage = STAGE_INIT;
     $connection->handshakeBuffer = new HandshakeBuffer();
     $connection->handshakeTimerId = Timer::add(10, function () use ($connection) {

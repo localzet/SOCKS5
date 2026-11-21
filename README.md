@@ -15,7 +15,7 @@ php start.php start
 php start.php stop
 ```
 
-Configuration: `SOCKS5_BIND` (default `127.0.0.1`), `SOCKS5_PORT` (1080), `SOCKS5_USERNAME`, `SOCKS5_PASSWORD`, `SOCKS5_MAX_CONNECTIONS` (1024 per worker), `SOCKS5_MAX_CONNECTIONS_PER_IP` (32), and `SOCKS5_MAX_ATTEMPTS_PER_MINUTE` (120). Missing credentials refuse startup. An explicit `SOCKS5_ALLOW_NO_AUTH=1` is supported only on a loopback bind. Never expose an anonymous proxy to a public network. Optional `SOCKS5_PID_FILE` and `SOCKS5_LOG_FILE` select service-managed runtime files.
+Configuration: `SOCKS5_BIND` (default `127.0.0.1`), `SOCKS5_PORT` (1080), `SOCKS5_USERNAME`, `SOCKS5_PASSWORD`, `SOCKS5_MAX_CONNECTIONS` (1024 per worker), `SOCKS5_MAX_CONNECTIONS_PER_IP` (32), and `SOCKS5_MAX_ATTEMPTS_PER_MINUTE` (120). Rate tracking stores up to 10,000 source IPs per worker; new IPs are rejected while the table is full until the least recently active entries expire. Attempt counts use one-second buckets, so an attempt at the 60-second boundary can remain counted for up to one extra second. Missing credentials refuse startup. An explicit `SOCKS5_ALLOW_NO_AUTH=1` is supported only on a loopback bind. Never expose an anonymous proxy to a public network. Optional `SOCKS5_PID_FILE` and `SOCKS5_LOG_FILE` select service-managed runtime files.
 
 SOCKS username/password authentication is plaintext on the wire, not encryption. Use a trusted local network or an authenticated encrypted tunnel; network binding is not a replacement for ingress controls. Logs do not dump authentication packets.
 
@@ -36,7 +36,7 @@ composer run check
 composer audit
 ```
 
-The integration suite starts a temporary proxy and local echo server, then checks fragmented/coalesced handshakes, early TCP data, relay, wrong credentials, disabled UDP/anonymous access, global and per-IP concurrent connection caps, and the per-IP attempt rate limit. CI does not deploy or publish a release. See `LICENSE` for licensing terms.
+The unit test checks per-IP attempt counts, tracking overflow and expiry boundaries. The integration suite starts a temporary proxy and local echo server, then checks fragmented/coalesced handshakes, early TCP data, relay, wrong credentials, disabled UDP/anonymous access, global and per-IP concurrent connection caps, and the per-IP attempt rate limit. CI does not deploy or publish a release. See `LICENSE` for licensing terms.
 
 ## Attribution
 
